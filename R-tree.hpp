@@ -79,6 +79,9 @@ private:
   int taken[M + 1];
   double tmpArea[M + 1];
 
+  Rec tmp[M + 1];
+  int taken[M + 1];
+  double tmpArea[M + 1];
   typedef RtreeNode* Node;
   typedef RtreeRoot* Root;
 
@@ -263,6 +266,30 @@ private:
     return RtreeSearch(root->rnode, target);
   }
 
+    int AddBranch(Root root, RtreeBranch *br, RtreeNode *node, Node *new_node)
+    {
+        if (node->count < sons(node))
+        {
+            for (int i = 0; i < sons(node); i++)
+            {
+                if (node->branch[i].son == NULL)
+                {
+                    node->branch[i] = *br;
+                    node->count++;
+                    break;
+                }
+            }
+            return 0;
+        }
+        SplitNode(root, node, br, new_node);
+        return 1;
+    }
+    void DeleteBranch(RtreeNode *node, int i)
+    {
+        node->branch[i].init();
+        node->count--;
+    }
+    
   void SplitNode(Root root, Node node, RtreeBranch *br, Node *new_node) {
     int level = node->level;
     for (int i = 0; i < M; i++) {

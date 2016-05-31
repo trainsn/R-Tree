@@ -37,10 +37,10 @@ private:
   public:
     double bound[2 * DIMENSION];  
     Rec() {
-      memset(bound, 0, sizeof bound);
+      memset(bound, 0, sizeof(bound));
     }
     void init() {
-      memset(bound, 0, sizeof bound);
+      memset(bound, 0, sizeof(bound));
     }
   };
   class RtreeNode { //Rtree结点
@@ -63,7 +63,7 @@ private:
     RtreeBranch() {}
     void init() {
       mbr.init();
-      son = NULL;
+      son = 0;
     }
   };
   class RtreeRoot {
@@ -79,16 +79,13 @@ private:
   int taken[M + 1];
   double tmpArea[M + 1];
 
-  Rec tmp[M + 1];
-  int taken[M + 1];
-  double tmpArea[M + 1];
   typedef RtreeNode* Node;
   typedef RtreeRoot* Root;
 
   Root R_root;
 
   Rtree() {
-    R_root = NULL;
+    R_root = 0;
   }
 
   Rtree(const Rtree &other) {
@@ -98,7 +95,7 @@ private:
   ~Rtree() {
     Destroy(R_root->rnode);
     delete R_root;
-    R_root = NULL;
+    R_root = 0;
   }
   int sons(Node node) { //返回一个结点的儿子数， 叶子和非叶子会有区别
   }
@@ -119,15 +116,15 @@ private:
 
   Node ChooseLeaf(Rec *mbr, Root root);
 
-  bool AddBranch(Root root, RtreeBranch *br, Node node, Node *new_node);
+  bool AddBranch(Root root, RtreeBranch *br, Node node, Node *new_node); // OK
 
-  void DeletBranch(Node node, int i); //
+  void DeletBranch(Node node, int i); // OK
 
   void Destroy(Node node); //释放空间,析构用 OK
 
   int RtreeSearch(Root root, Rec *target); // OK
 
-  int RtreeInsert(Root root, Rec *data, int level);
+  int RtreeInsert(Root root, Rec *data, int level); // OK
 
   int RtreeDelete(Root root, Rec *data);
 
@@ -195,11 +192,11 @@ private:
   
   Rec CoverRec(Node node) {
     Rec ret;
-    bool flg = 1;
+    bool flag = 1;
     for (int i = 0; i < sons(node); i++) {
-      if (flg) {
+      if (flag) {
         ret = (node->branch[i]).mbr;
-        flg = 0;
+        flag = 0;
       } else {
         ret = CombineRec(&ret, &((node->branch[i]).mbr));
       }
@@ -220,74 +217,105 @@ private:
     return 0;
   }
 
-  int ChooseBranch(Rec *mbr, Node node) {
-    int best = -1;
-    double bestinc = -1;
-    double bestfor = -1;
-    for (int i = 0; i < sons(node); i++) {
-      Rec tmp = CombineRec(mbr, &((node->branch[i]).mbr));
-      double former = RecArea(&((node->branch[i]).mbr));
-      double increment = RecArea(&tmp) - former; 
-      if (best == -1 || isbetter(former, increment, bestinc, bestfor)) {
-        best = i;
-        bestinc = increment;
-        bestfor = former;
-      } 
-    }
-    return best;
-  }
+  
 
   void Destroy(Node node) {
-    if (node == NULL) {
+    if (!node) {
       return;
     }
     for (int i = 0; i < sons(node); i++) {
       Destroy(node->branch[i].son);
     }
     delete node;
-    node = NULL;
+    node = 0;
   }
 
-  int RtreeSearch(Node node, Rec *target) {
-    int ret = 0;
-    for (int i = 0; i < sons(node); i++) {
-      if (overlap(&((node->branch[i]).mbr), target)) {
-        if (node->level > 0) {
-          ret += search(node->branch[i].son, target);
-        } else {
-          ret++;
+  
+
+  int ChooseBranch(Rec *mbr, Node node) {
+        int best = -1;
+        double bestinc = -1;
+        double bestfor = -1;
+        for (int i = 0; i < sons(node); i++) {
+            Rec tmp = CombineRec(mbr, &((node->branch[i]).mbr));
+            double former = RecArea(&((node->branch[i]).mbr));
+            double increment = RecArea(&tmp) - former;
+            if (best == -1 || isbetter(former, increment, bestinc, bestfor)) {
+                best = i;
+                bestinc = increment;
+                bestfor = former;
+            } 
         }
+        return best;
+  }
+    
+  int AddBranch(Root root, RtreeBranch *br, RtreeNode *node, Node *new_node)
+  {
+      if (node->count < sons(node))
+      {
+          for (int i = 0; i < sons(node); i++)
+          {
+              if (!(node->branch[i].son))
+              {
+                  node->branch[i] = *br;
+                  node->count++;
+                  break;
+              }
+          }
+          return 0;
       }
-    }
-    return ret;
+      SplitNode(root, node, br, new_node);
+      return 1;
   }
-
-  int RtreeSearch(Root root, Rec *target) {
-    return RtreeSearch(root->rnode, target);
+    
+  void DeleteBranch(RtreeNode *node, int i)
+  {
+      node->branch[i].init();
+      node->count--;
   }
-
-    int AddBranch(Root root, RtreeBranch *br, RtreeNode *node, Node *new_node)
-    {
-        if (node->count < sons(node))
+    
+  bool RtreeInsert(Root root, Rec *mbr, RtreeNode *node, Node *new_node, int level)
+  {
+        Node nn;
+        RtreeBranch nb;
+        if(node->level > level)
         {
-            for (int i = 0; i < sons(node); i++)
+            int i = ChooseBranch(mbr, node);
+            if(!RtreeInsert(root, mbr, node->branch[i].child, &nn, level))
             {
-                if (node->branch[i].son == NULL)
-                {
-                    node->branch[i] = *br;
-                    node->count++;
-                    break;
+                node->branch[i].mbr = CombineRec(mbr, &(node->branch[i].mbr));
+                return 0;
+            }
+            
+            node->branch[i].mbr = CoverNode(node->branch[i].son);
+            nb.son = nn;
+            nb.mbr = CoverNode(nn);
+            return AddBranch(root, &nb, node, new_node);
+        }
+        else
+        {
+            nb.mbr = mbr;
+            nb.child = 0;
+            return AddBranch(root, &nb, node, new_node);
+        }
+  }
+    
+    int RtreeSearch(Node node, Rec *target) {
+        int ret = 0;
+        for (int i = 0; i < sons(node); i++) {
+            if (overlap(&((node->branch[i]).mbr), target)) {
+                if (node->level > 0) {
+                    ret += search(node->branch[i].son, target);
+                } else {
+                    ret++;
                 }
             }
-            return 0;
         }
-        SplitNode(root, node, br, new_node);
-        return 1;
+        return ret;
     }
-    void DeleteBranch(RtreeNode *node, int i)
-    {
-        node->branch[i].init();
-        node->count--;
+    
+    int RtreeSearch(Root root, Rec *target) {
+        return RtreeSearch(root->rnode, target);
     }
     
   void SplitNode(Root root, Node node, RtreeBranch *br, Node *new_node) {

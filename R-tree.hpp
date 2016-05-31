@@ -50,7 +50,7 @@ private:
     RtreeBranch branch[M];
     RtreeNode() {
       count = 0;
-      level = 0;
+      level = -1;
       for (int i = 0; i < M; i++) {
         branch[i].init();
       }
@@ -74,6 +74,10 @@ private:
     Rec overall;
     double overallArea;
   };
+  
+  Rec tmp[M + 1];
+  int taken[M + 1];
+  double tmpArea[M + 1];
 
   typedef RtreeNode* Node;
   typedef RtreeRoot* Root;
@@ -96,7 +100,7 @@ private:
   int sons(Node node) { //返回一个结点的儿子数， 叶子和非叶子会有区别
   }
 
-  Rec NullRec();
+  Rec NullRec(); //OK
 
   double RecArea(Rec *mbr); //n维矩形最小边界球体积 OK
 
@@ -104,26 +108,28 @@ private:
 
   bool RecOverlap(Rec *rc1, Rec *rc2); //返回rc1和rc2是否overlap OK
 
-  void SplitNode(Root root, Node node, RtreeBranch *br, Node &new_node); //将node分裂成node和new_node 
+  void SplitNode(Root root, Node node, RtreeBranch *br, Node *new_node); //将node分裂成node和new_node 
 
   Rec CoverRec(Node node); //返回包含node中所有branch的最小矩形 OK
 
   int ChooseBranch(Rec *mbr, Node node); //返回node的所有branch中加入mbr之后覆盖矩形增量最小的branch编号 OK
 
-  int RTreeAddBranch(Root root, RtreeBranch *br, Node node, Node &new_node);
+  Node ChooseLeaf(Rec *mbr, Root root);
 
-  void CutNode(Node node, int i); //
+  bool AddBranch(Root root, RtreeBranch *br, Node node, Node *new_node);
+
+  void DeletBranch(Node node, int i); //
 
   void Destroy(Node node); //释放空间,析构用 OK
 
-  int RtreeSearch(Root root, Rec *target);
+  int RtreeSearch(Root root, Rec *target); // OK
 
   int RtreeInsert(Root root, Rec *data, int level);
 
   int RtreeDelete(Root root, Rec *data);
 
   //..split 过程中还需要一些函数，未加入
-
+  //然而我现在全写在了split里面了 by Steiner
 
   Rec NullRec() {
     Rec ret;
@@ -257,7 +263,97 @@ private:
     return RtreeSearch(root->rnode, target);
   }
 
-  
+  void SplitNode(Root root, Node node, RtreeBranch *br, Node *new_node) {
+    int level = node->level;
+    for (int i = 0; i < M; i++) {
+      tmp[i] = node->branch[i].mbr;
+    }
+    tmp[M] = *br;
+    Node nn = new RtreeNode;
+    Rec uni = tmp[0];
+    for (int i = 1; i < M + 1; i++) {
+      uni = CombineRec(uni, tmp[i]);
+    }
+    for (int i = 0; i < M; i++) {
+      tmpArea[i] = RecArea(tmp[i]);
+    }
+    double area = RecArea(uni);
+
+    int seed0 = -1, seed1 = -1;
+    for (int i = 0; i < M; i++) {
+      for (int j = i + 1; j < M + 1; j++) {
+        if (area - tmpArea[i] - tmpArea[j] > worst) {
+          worst = area - tmpArea[i] - tmpArea[j];
+          seed0 = i;
+          seed1 = j;
+        }
+      }
+    }
+    for (int i = 0; i < M + 1; i++) {
+      taken[i] = -1;
+    }
+
+    taken[seed0] = 0;
+    taken[seed1] = 1;
+    
+    Rec group[2];
+    double garea[2];
+    group[0] = tmp[seed0];
+    group[1] = tmo[seed1];
+    garea[0] = tmpArea[seed0];
+    garea[1] = tmpArea[seed1];
+
+    int count[2];
+    count[0] = count[1] = 1;
+    int rest = M - 2;
+    int bigger = 0;
+    double best = -1;
+    pair<int, int> which = make_pair(-1, -1);
+
+    for (; rest > 0 && count[bigger] < (M + 1) / 2; ) {
+      for (int i = 0; i < M + 1; i++) {
+        if (taken[i] > -1) {
+          continue;
+        }
+        double d0 = RecArea(CombineRec(group[0], tmp[i])) - garea[0];
+        double d1 = RecArea(CombineRec(group[1], tmp[i])) - garea[1];
+        if (fabs(d0 - d1) > best) {
+          best = fabs(d0 - d1);
+          which = make_pair((sign(d0 - d1) < 0 ? 0 : 1), i);
+        }
+      }
+      taken[which.second] = which.first;
+      rest--;
+      count[which.first]++;
+      if (count[which.first] > count[bigger]) {
+        bigger = which.first;
+      }
+      group[which.first] = CombineRec(group[which.first], tmp[which.second]);
+      garea[which.first] = RecArea(group[which.first]);
+    }
+    if (rest > 0) {
+      for (int i = 0; i < M + 1; i++) {
+        if (taken[i] == -1) {
+          group[bigger ^ 1] = CombineRec(group[bigger ^ 1], tmp[i]);
+          taken[i] = (bigger ^ 1);
+        }
+      }
+    }
+    *new_node = new RtreeNode;
+    (*new_node)->level = level;
+    node->count = 0;
+    for (int i = 0; i < M; i++) {
+      node->branch[i].init();
+    }
+    for (int i = 0; i < M + 1; i+++) {
+      if (taken[i] == 0) {
+        node->branch[(node->count)++] = tmp[i];
+      } else {
+        (*new_node)->branch[(*new_node)->count++] = tmp[i];
+      }
+    }
+
+  }
 
 public:
   void insert(vector<double> rec) { //插入一个区域(元素)

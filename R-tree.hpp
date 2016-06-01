@@ -23,7 +23,8 @@ protected:
 public:
 	RTree()
 	{
-		R_root = 0;
+		R_root = new RtreeRoot;
+		R_root->rnode = nullptr;
 	}
 
 	RTree(const RTree &other)
@@ -328,7 +329,9 @@ protected:
 			node->branch[node->count++] = *br;
 			return false;
 		}
+		assert(node->count == M);
 		SplitNode(node, br, new_node);
+		assert(node->count + (*new_node)->count == M + 1);
 		return true;
 	}
 
@@ -363,21 +366,36 @@ protected:
 	}
 	void insert(const Rec & data)
 	{
-		RtreeNode *nnode;
-		bool res = RtreeInsert(&data, R_root->rnode, nnode);
-		if (res)
+		if (R_root->rnode)
 		{
-
-			RtreeNode* & r=R_root->rnode;
-			RtreeNode* temp = r;
-			r=new RtreeNode();
-			r->branch[0].mbr = CoverRec(temp);
-			r->branch[1].mbr = CoverRec(nnode);
-			r->branch[0].child = temp;
-			r->branch[1].child = nnode;
-			r->count = 2;
+			RtreeNode *nnode = nullptr;
+			bool res = RtreeInsert(&data, R_root->rnode, nnode);
+			if (res)
+			{
+				assert(nnode);
+				RtreeNode* & r = R_root->rnode;
+				RtreeNode* temp = r;
+				r = new RtreeNode();
+				r->branch[0].mbr = CoverRec(temp);
+				r->branch[1].mbr = CoverRec(nnode);
+				r->branch[0].child = temp;
+				r->branch[1].child = nnode;
+				r->count = 2;
+				assert(temp->level == nnode->level);
+				r->level = temp->level + 1;
+			}
+			return;
 		}
-		return;
+		else
+		{
+			RtreeNode* & r = R_root->rnode;
+			r = new RtreeNode();
+			r->branch[0].mbr = data;
+			r->branch[0].child = nullptr;
+			r->count = 1;
+			r->level = 0;
+			return;
+		}
 	}
 	int RtreeSearch(const RtreeNode *node, const Rec *target)
 	{

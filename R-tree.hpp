@@ -1,430 +1,505 @@
-#include <iostream>
-#include <cstdio>
+#ifndef SJTU_RTREE
+#define SJTU_RTREE
 
-using namespace std;
+#include <cstring>
+#include <cassert>
+#include <cmath>
+#include <algorithm>
+#include <vector>
+#include <stdexcept>
+
 const int DIMENSION = 3; // R树维护的空间维数
 const int M = 10; //最大分支数
-const double eps = 1e-8;
-const double xpi[] = {
- 0.000000,  /* dimension   0 */
- 2.000000,  /* dimension   1 */
- 3.141593,  /* dimension   2 */
- 4.188790,  /* dimension   3 */
- 4.934802,  /* dimension   4 */
- 5.263789,  /* dimension   5 */
- 5.167713,  /* dimension   6 */
- 4.724766,  /* dimension   7 */
- 4.058712,  /* dimension   8 */
- 3.298509,  /* dimension   9 */
- 2.550164,  /* dimension  10 */
- 1.884104,  /* dimension  11 */
- 1.335263,  /* dimension  12 */
- 0.910629,  /* dimension  13 */
- 0.599265,  /* dimension  14 */
- 0.381443,  /* dimension  15 */
- 0.235331,  /* dimension  16 */
- 0.140981,  /* dimension  17 */
- 0.082146,  /* dimension  18 */
- 0.046622,  /* dimension  19 */
- 0.025807,  /* dimension  20 */
-};
-int sign(double x) {
-  return x < -eps ? -1 : x > eps;
-}
-class RTree {
-private:
-  class Rec { //n维空间矩形
-  public:
-    double bound[2 * DIMENSION];  
-    Rec() {
-      memset(bound, 0, sizeof(bound));
-    }
-    void init() {
-      memset(bound, 0, sizeof(bound));
-    }
-  };
-  class RtreeNode { //Rtree结点
-  public:
-    int count;
-    int level; //0 -> leaf
-    RtreeBranch branch[M];
-    RtreeNode() {
-      count = 0;
-      level = -1;
-      for (int i = 0; i < M; i++) {
-        branch[i].init();
-      }
-    }
-  };
-  class RtreeBranch { //结点中的分支
-  public:
-    Rec mbr;
-    RtreeNode *son;
-    RtreeBranch() {}
-    void init() {
-      mbr.init();
-      son = 0;
-    }
-  };
-  class RtreeRoot {
-  public:
-    RtreeNode *rnode;
-    RtreeBranch branch[M + 1];
-    int count;
-    Rec overall;
-    double overallArea;
-  };
-  
-  Rec tmp[M + 1];
-  int taken[M + 1];
-  double tmpArea[M + 1];
 
-  typedef RtreeNode* Node;
-  typedef RtreeRoot* Root;
 
-  Root R_root;
 
-  Rtree() {
-    R_root = 0;
-  }
-
-  Rtree(const Rtree &other) {
-
-  }
-
-  ~Rtree() {
-    Destroy(R_root->rnode);
-    delete R_root;
-    R_root = 0;
-  }
-  int sons(Node node) { //返回一个结点的儿子数， 叶子和非叶子会有区别
-  }
-
-  Rec NullRec(); //OK
-
-  double RecArea(Rec *mbr); //n维矩形最小边界球体积 OK
-
-  Rec CombineRec(Rec *rc1, Rec *rc2); //返回包含rc1和rc2的最小矩形 OK
-
-  bool RecOverlap(Rec *rc1, Rec *rc2); //返回rc1和rc2是否overlap OK
-
-  void SplitNode(Root root, Node node, RtreeBranch *br, Node *new_node); //将node分裂成node和new_node 
-
-  Rec CoverRec(Node node); //返回包含node中所有branch的最小矩形 OK
-
-  int ChooseBranch(Rec *mbr, Node node); //返回node的所有branch中加入mbr之后覆盖矩形增量最小的branch编号 OK
-
-  Node ChooseLeaf(Rec *mbr, Root root);
-
-  bool AddBranch(Root root, RtreeBranch *br, Node node, Node *new_node); // OK
-
-  void DeletBranch(Node node, int i); // OK
-
-  void Destroy(Node node); //释放空间,析构用 OK
-
-  int RtreeSearch(Root root, Rec *target); // OK
-
-  int RtreeInsert(Root root, Rec *data, int level); // OK
-
-  int RtreeDelete(Root root, Rec *data);
-
-  //..split 过程中还需要一些函数，未加入
-  //然而我现在全写在了split里面了 by Steiner
-
-  Rec NullRec() {
-    Rec ret;
-    ret.bound[0] = 1;
-    ret.bound[DIMENSION] = -1;
-    for (int i = 1; i < DIMENSION; i++) {
-      ret.bound[i] = ret.bound[i + DIMENSION] = 0;
-    }
-    return ret;
-  }
-
-  double RecArea(Rec *mbr) {
-    double ret = 0;
-    if (invalid_rec(mbr)) {
-      return 0;
-    }
-    double sumr = 0;
-    for (int i = 0; i < DIMENSION; i++) {
-      double len = (buond[i + DIMENSION] - bound[i]) / 2;
-      sumr += len * len;
-    }
-    double radius = sqrt(sumr);
-    ret = pow(radius, DIMENSION) * xpi[DIMENSION];
-    return ret;
-  }
-
-  Rec CombineRec(Rec *rc1, Rec *rc2) {
-    Rec ret;
-    if (invalid_rec(rc1)) {
-      return *rc2;
-    }
-    if (invalid_rec(rc2)) {
-      return *rc1;
-    }
-    for (int i = 0; i < DIMENSION; i++) {
-      ret.bound[i] = min(rc1->bound[i], rc2->bound[i]);
-    }
-    for (int i = DIMENSION; i < 2 * DIMENSION; i++) {
-      ret.bound[i] = max(rc1->bound[i], rc2->bound[i]);
-    }
-    return ret;
-  }
-
-  bool RecOverlap(Rec *rc1, Rec *rc2) {
-    if (invalid_rec(rc2) || invalid_rec(rc1)) {
-      return 0;
-    }
-    Rec tmp;
-    for (int i = 0; i < DIMENSION; i++) {
-      tmp.bound[i] = max(rc1->bound[i], rc2->bound[i]);
-      tmp.bound[i + DIMENSION] = min(rc1->bound[i + DIMENSION], rc2->bound[i + DIMENSION]);
-    }
-    for (int i = 0; i < DIMENSION; i++) {
-      if (tmp.bound[i] > tmp.bound[i + DIMENSION]) {
-        return false;
-      }
-    }
-    return true;
-  }
-  
-  Rec CoverRec(Node node) {
-    Rec ret;
-    bool flag = 1;
-    for (int i = 0; i < sons(node); i++) {
-      if (flag) {
-        ret = (node->branch[i]).mbr;
-        flag = 0;
-      } else {
-        ret = CombineRec(&ret, &((node->branch[i]).mbr));
-      }
-    }
-    return ret;
-  }
-
-  bool isbetter(double former, double increment, double bestinc, double bestfor) {
-    if (sign(bestinc) < 0) {
-      return true;
-    }
-    if (sign(increment - bestinc) < 0) {
-      return true;
-    }
-    if (sign(increment - bestinc) == 0) {
-      return sign(former - bestfor) < 0;
-    }
-    return 0;
-  }
-
-  
-
-  void Destroy(Node node) {
-    if (!node) {
-      return;
-    }
-    for (int i = 0; i < sons(node); i++) {
-      Destroy(node->branch[i].son);
-    }
-    delete node;
-    node = 0;
-  }
-
-  
-
-  int ChooseBranch(Rec *mbr, Node node) {
-        int best = -1;
-        double bestinc = -1;
-        double bestfor = -1;
-        for (int i = 0; i < sons(node); i++) {
-            Rec tmp = CombineRec(mbr, &((node->branch[i]).mbr));
-            double former = RecArea(&((node->branch[i]).mbr));
-            double increment = RecArea(&tmp) - former;
-            if (best == -1 || isbetter(former, increment, bestinc, bestfor)) {
-                best = i;
-                bestinc = increment;
-                bestfor = former;
-            } 
-        }
-        return best;
-  }
-    
-  int AddBranch(Root root, RtreeBranch *br, RtreeNode *node, Node *new_node)
-  {
-      if (node->count < sons(node))
-      {
-          for (int i = 0; i < sons(node); i++)
-          {
-              if (!(node->branch[i].son))
-              {
-                  node->branch[i] = *br;
-                  node->count++;
-                  break;
-              }
-          }
-          return 0;
-      }
-      SplitNode(root, node, br, new_node);
-      return 1;
-  }
-    
-  void DeleteBranch(RtreeNode *node, int i)
-  {
-      node->branch[i].init();
-      node->count--;
-  }
-    
-  bool RtreeInsert(Root root, Rec *mbr, RtreeNode *node, Node *new_node, int level)
-  {
-        Node nn;
-        RtreeBranch nb;
-        if(node->level > level)
-        {
-            int i = ChooseBranch(mbr, node);
-            if(!RtreeInsert(root, mbr, node->branch[i].child, &nn, level))
-            {
-                node->branch[i].mbr = CombineRec(mbr, &(node->branch[i].mbr));
-                return 0;
-            }
-            
-            node->branch[i].mbr = CoverNode(node->branch[i].son);
-            nb.son = nn;
-            nb.mbr = CoverNode(nn);
-            return AddBranch(root, &nb, node, new_node);
-        }
-        else
-        {
-            nb.mbr = mbr;
-            nb.child = 0;
-            return AddBranch(root, &nb, node, new_node);
-        }
-  }
-    
-    int RtreeSearch(Node node, Rec *target) {
-        int ret = 0;
-        for (int i = 0; i < sons(node); i++) {
-            if (overlap(&((node->branch[i]).mbr), target)) {
-                if (node->level > 0) {
-                    ret += search(node->branch[i].son, target);
-                } else {
-                    ret++;
-                }
-            }
-        }
-        return ret;
-    }
-    
-    int RtreeSearch(Root root, Rec *target) {
-        return RtreeSearch(root->rnode, target);
-    }
-    
-  void SplitNode(Root root, Node node, RtreeBranch *br, Node *new_node) {
-    int level = node->level;
-    for (int i = 0; i < M; i++) {
-      tmp[i] = node->branch[i].mbr;
-    }
-    tmp[M] = *br;
-    Node nn = new RtreeNode;
-    Rec uni = tmp[0];
-    for (int i = 1; i < M + 1; i++) {
-      uni = CombineRec(uni, tmp[i]);
-    }
-    for (int i = 0; i < M; i++) {
-      tmpArea[i] = RecArea(tmp[i]);
-    }
-    double area = RecArea(uni);
-
-    int seed0 = -1, seed1 = -1;
-    for (int i = 0; i < M; i++) {
-      for (int j = i + 1; j < M + 1; j++) {
-        if (area - tmpArea[i] - tmpArea[j] > worst) {
-          worst = area - tmpArea[i] - tmpArea[j];
-          seed0 = i;
-          seed1 = j;
-        }
-      }
-    }
-    for (int i = 0; i < M + 1; i++) {
-      taken[i] = -1;
-    }
-
-    taken[seed0] = 0;
-    taken[seed1] = 1;
-    
-    Rec group[2];
-    double garea[2];
-    group[0] = tmp[seed0];
-    group[1] = tmo[seed1];
-    garea[0] = tmpArea[seed0];
-    garea[1] = tmpArea[seed1];
-
-    int count[2];
-    count[0] = count[1] = 1;
-    int rest = M - 2;
-    int bigger = 0;
-    double best = -1;
-    pair<int, int> which = make_pair(-1, -1);
-
-    for (; rest > 0 && count[bigger] < (M + 1) / 2; ) {
-      for (int i = 0; i < M + 1; i++) {
-        if (taken[i] > -1) {
-          continue;
-        }
-        double d0 = RecArea(CombineRec(group[0], tmp[i])) - garea[0];
-        double d1 = RecArea(CombineRec(group[1], tmp[i])) - garea[1];
-        if (fabs(d0 - d1) > best) {
-          best = fabs(d0 - d1);
-          which = make_pair((sign(d0 - d1) < 0 ? 0 : 1), i);
-        }
-      }
-      taken[which.second] = which.first;
-      rest--;
-      count[which.first]++;
-      if (count[which.first] > count[bigger]) {
-        bigger = which.first;
-      }
-      group[which.first] = CombineRec(group[which.first], tmp[which.second]);
-      garea[which.first] = RecArea(group[which.first]);
-    }
-    if (rest > 0) {
-      for (int i = 0; i < M + 1; i++) {
-        if (taken[i] == -1) {
-          group[bigger ^ 1] = CombineRec(group[bigger ^ 1], tmp[i]);
-          taken[i] = (bigger ^ 1);
-        }
-      }
-    }
-    *new_node = new RtreeNode;
-    (*new_node)->level = level;
-    node->count = 0;
-    for (int i = 0; i < M; i++) {
-      node->branch[i].init();
-    }
-    for (int i = 0; i < M + 1; i+++) {
-      if (taken[i] == 0) {
-        node->branch[(node->count)++] = tmp[i];
-      } else {
-        (*new_node)->branch[(*new_node)->count++] = tmp[i];
-      }
-    }
-
-  }
-
+class RTree
+{
+protected:
+	struct Rec;
+	struct RtreeNode;
+	struct RtreeBranch;
+	struct RtreeRoot;
 public:
-  void insert(vector<double> rec) { //插入一个区域(元素)
-  }
+	RTree()
+	{
+		R_root = 0;
+	}
 
-  void delete(vector<double> rec) { //删除一个区域(元素)
-  }
+	RTree(const RTree &other)
+	{
 
-  int search(vector<double> rec) { // 查询一个区域内有多少元素
-    Rec data;
-    if (rec.size() != DIMENSION * 2) {
-      throw invalid_input();
-    }
-    for (int i = 0; i < 2 * DIMENSION) {
-      data.bound[i] = rec[i];
-    }
-    return RtreeSearch(root, &data);
-  }
+	}
+
+	~RTree()
+	{
+		Destroy(R_root->rnode);
+		delete R_root;
+		R_root = 0;
+	}
+
+	void insert(const std::vector<double> &rec)
+	{ //插入一个区域(元素)
+	}
+
+	void remove(const std::vector<double> &rec)
+	{ //删除一个区域(元素)
+	}
+
+	int search(const std::vector<double> &rec)
+	{ // 查询一个区域内有多少元素
+		Rec data;
+		if (rec.size() != DIMENSION * 2)
+		{
+			throw std::invalid_argument("The number of input doesn't match dimension");
+		}
+		for (int i = 0; i < 2 * DIMENSION;i++)
+		{
+			data.bound[i] = rec[i];
+		}
+		return RtreeSearch(R_root, &data);
+	}
+
+
+protected:
+	struct Rec
+	{ //n维空间矩形
+		double bound[2 * DIMENSION];
+		Rec()
+		{
+			memset(bound, 0, sizeof(bound));
+		}
+		void init()
+		{
+			memset(bound, 0, sizeof(bound));
+		}
+		bool is_valid() const
+		{
+			for (int i = 0; i < DIMENSION; i++)
+				if (bound[i] > bound[i + DIMENSION])
+					return false;
+			return true;
+		}
+	};
+	struct RtreeBranch
+	{ //结点中的分支
+		Rec mbr;
+		RtreeNode *child;
+		RtreeBranch() {}
+		void init()
+		{
+			mbr.init();
+			child = 0;
+		}
+	};
+	struct RtreeNode
+	{ //Rtree结点
+		int count;
+		int level; //0 -> leaf
+		RtreeBranch branch[M];
+		RtreeNode()
+		{
+			count = 0;
+			level = -1;
+			for (int i = 0; i < M; i++)
+			{
+				branch[i].init();
+			}
+		}
+	};
+	struct RtreeRoot
+	{
+		RtreeNode *rnode;
+	};
+
+	
+
+	typedef RtreeNode *Node;
+	typedef RtreeRoot *Root;
+
+	RtreeRoot *R_root;
+
+	
+	/*int sons(Node node)
+	{ //返回一个结点的儿子数， 叶子和非叶子会有区别
+	}*/
+
+	//Rec NullRec(); //OK
+
+	//double RecArea(Rec *mbr); //n维矩形最小边界球体积 OK
+
+	//Rec CombineRec(Rec *rc1, Rec *rc2); //返回包含rc1和rc2的最小矩形 OK
+
+	//bool RecOverlap(Rec *rc1, Rec *rc2); //返回rc1和rc2是否overlap OK
+
+	void SplitNode(Root root, Node node, RtreeBranch *br, Node *new_node); //将node分裂成node和new_node 
+
+	//Rec CoverRec(Node node); //返回包含node中所有branch的最小矩形 OK
+
+	//int ChooseBranch(Rec *mbr, Node node); //返回node的所有branch中加入mbr之后覆盖矩形增量最小的branch编号 OK
+
+	Node ChooseLeaf(Rec *mbr, Root root);
+
+	//bool AddBranch(Root root, RtreeBranch *br, Node node, Node *new_node); // OK
+
+	//void DeletBranch(Node node, int i); // OK
+
+	void Destroy(Node node); //释放空间,析构用 OK
+
+	int RtreeSearch(Root root, Rec *target); // OK
+
+	int RtreeInsert(Root root, Rec *data, int level); // OK
+
+	int RtreeDelete(Root root, Rec *data);
+
+	//..split 过程中还需要一些函数，未加入
+	//然而我现在全写在了split里面了 by Steiner
+
+	Rec NullRec()
+	{
+		Rec ret;
+		ret.bound[0] = 1;
+		ret.bound[DIMENSION] = -1;
+		for (int i = 1; i < DIMENSION; i++)
+		{
+			ret.bound[i] = ret.bound[i + DIMENSION] = 0;
+		}
+		return ret;
+	}
+
+	double RecArea(const Rec *mbr)
+	{
+		if (!mbr->is_valid())
+			return 0;
+		static const double xpi = vratio(DIMENSION);
+		double ret = 0;
+		double sumr = 0;
+		for (int i = 0; i < DIMENSION; i++)
+		{
+			double len = (mbr->bound[i + DIMENSION] - mbr->bound[i]) / 2;
+			sumr += len * len;
+		}
+		double radius = sqrt(sumr);
+		ret = pow(radius, DIMENSION) * xpi;
+		return ret;
+	}
+
+	Rec CombineRec(const Rec *rc1, const Rec *rc2)
+	{
+		if (!rc1->is_valid())
+			return *rc2;
+		if (!rc2->is_valid())
+			return *rc1;
+		Rec ret;
+		for (int i = 0; i < DIMENSION; i++)
+		{
+			ret.bound[i] = std::min(rc1->bound[i], rc2->bound[i]);
+		}
+		for (int i = DIMENSION; i < 2 * DIMENSION; i++)
+		{
+			ret.bound[i] = std::max(rc1->bound[i], rc2->bound[i]);
+		}
+		return ret;
+	}
+
+	static bool RecOverlap(const Rec *rc1, const Rec *rc2)
+	{
+		assert(rc1->is_valid() && rc2->is_valid());
+		Rec tmp;
+		for (int i = 0; i < DIMENSION; i++)
+		{
+			tmp.bound[i] = std::max(rc1->bound[i], rc2->bound[i]);
+			tmp.bound[i + DIMENSION] = std::min(rc1->bound[i + DIMENSION], rc2->bound[i + DIMENSION]);
+		}
+		for (int i = 0; i < DIMENSION; i++)
+		{
+			if (tmp.bound[i] > tmp.bound[i + DIMENSION])
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	Rec CoverRec(const RtreeNode *node)
+	{
+		Rec ret;
+		bool flag = 1;
+		for (int i = 0; i < node->count; i++)
+		{
+			if (flag)
+			{
+				ret = (node->branch[i]).mbr;
+				flag = 0;
+			}
+			else
+			{
+				ret = CombineRec(&ret, &((node->branch[i]).mbr));
+			}
+		}
+		return ret;
+	}
+
+
+
+	void Destroy(RtreeNode *node)
+	{
+		if (!node)
+		{
+			return;
+		}
+		for (int i = 0; i < M; i++)
+		{
+			Destroy(node->branch[i].son);
+		}
+		delete node;
+		node = 0;
+	}
+
+
+
+	int ChooseBranch(Rec *mbr, Node node)
+	{
+		int best = -1;
+		double bestinc = -1;
+		double bestfor = -1;
+		for (int i = 0; i < node->count; i++)
+		{
+			Rec tmp = CombineRec(mbr, &((node->branch[i]).mbr));
+			double former = RecArea(&((node->branch[i]).mbr));
+			double increment = RecArea(&tmp) - former;
+			if (best == -1 || isbetter(former, increment, bestinc, bestfor))
+			{
+				best = i;
+				bestinc = increment;
+				bestfor = former;
+			}
+		}
+		return best;
+	}
+
+	bool AddBranch(Root root, RtreeBranch *br, RtreeNode *node, Node *new_node)
+	{
+		if (node->count < M)
+		{
+			node->branch[node->count++] = *br;
+			return false;
+		}
+		SplitNode(root, node, br, new_node);
+		return true;
+	}
+
+	void DeleteBranch(RtreeNode *node, int i)
+	{
+		assert(node->count >= 1);
+		std::swap(node->branch[i], node->branch[node->count-1]);
+		node->count--;
+	}
+
+	bool RtreeInsert(Root root, Rec *mbr, RtreeNode *node, Node *new_node, int level)
+	{
+		Node nn;
+		RtreeBranch nb;
+		if (node->level > level)
+		{
+			int i = ChooseBranch(mbr, node);
+			if (!RtreeInsert(root, mbr, node->branch[i].child, &nn, level))
+			{
+				node->branch[i].mbr = CombineRec(mbr, &(node->branch[i].mbr));
+				return 0;
+			}
+
+			node->branch[i].mbr = CoverRec(node->branch[i].child);
+			nb.child = nn;
+			nb.mbr = CoverRec(nn);
+			return AddBranch(root, &nb, node, new_node);
+		}
+		else
+		{
+			nb.mbr = *mbr;
+			nb.child = 0;
+			return AddBranch(root, &nb, node, new_node);
+		}
+	}
+
+	int RtreeSearch(const RtreeNode *node, const Rec *target)
+	{
+		int ret = 0;
+		for (int i = 0; i < node->count; i++)
+		{
+			if (RecOverlap(&((node->branch[i]).mbr), target))
+			{
+				if (node->level > 0)
+				{
+					ret += RtreeSearch(node->branch[i].child, target);
+				}
+				else
+				{
+					ret++;
+				}
+			}
+		}
+		return ret;
+	}
+
+	int RtreeSearch(Root root, Rec *target)
+	{
+		return RtreeSearch(root->rnode, target);
+	}
+
+	void SplitNode(Root root, Node node, RtreeBranch *br, Node *new_node)
+	{
+		static Rec tmp[M + 1];
+		static int taken[M + 1];
+		static double tmpArea[M + 1];
+
+		int level = node->level;
+		for (int i = 0; i < M; i++)
+		{
+			tmp[i] = node->branch[i].mbr;
+		}
+		tmp[M] = *br;
+		Node nn = new RtreeNode;
+		Rec uni = tmp[0];
+		for (int i = 1; i < M + 1; i++)
+		{
+			uni = CombineRec(uni, tmp[i]);
+		}
+		for (int i = 0; i < M + 1; i++)
+		{
+			tmpArea[i] = RecArea(tmp[i]);
+		}
+		double area = RecArea(uni);
+
+		int seed0 = -1, seed1 = -1;
+		for (int i = 0; i < M; i++)
+		{
+			for (int j = i + 1; j < M + 1; j++)
+			{
+				if (area - tmpArea[i] - tmpArea[j] > worst)
+				{
+					worst = area - tmpArea[i] - tmpArea[j];
+					seed0 = i;
+					seed1 = j;
+				}
+			}
+		}
+		for (int i = 0; i < M + 1; i++)
+		{
+			taken[i] = -1;
+		}
+
+		taken[seed0] = 0;
+		taken[seed1] = 1;
+
+		Rec group[2];
+		double garea[2];
+		group[0] = tmp[seed0];
+		group[1] = tmo[seed1];
+		garea[0] = tmpArea[seed0];
+		garea[1] = tmpArea[seed1];
+
+		int count[2];
+		count[0] = count[1] = 1;
+		int rest = M - 2;
+		int bigger = 0;
+		double best = -1;
+		pair<int, int> which = make_pair(-1, -1);
+
+		for (; rest > 0 && count[bigger] < (M + 1) / 2; )
+		{
+			for (int i = 0; i < M + 1; i++)
+			{
+				if (taken[i] > -1)
+				{
+					continue;
+				}
+				double d0 = RecArea(CombineRec(group[0], tmp[i])) - garea[0];
+				double d1 = RecArea(CombineRec(group[1], tmp[i])) - garea[1];
+				if (fabs(d0 - d1) > best)
+				{
+					best = fabs(d0 - d1);
+					which = make_pair((sign(d0 - d1) < 0 ? 0 : 1), i);
+				}
+			}
+			taken[which.second] = which.first;
+			rest--;
+			count[which.first]++;
+			if (count[which.first] > count[bigger])
+			{
+				bigger = which.first;
+			}
+			group[which.first] = CombineRec(group[which.first], tmp[which.second]);
+			garea[which.first] = RecArea(group[which.first]);
+		}
+		if (rest > 0)
+		{
+			for (int i = 0; i < M + 1; i++)
+			{
+				if (taken[i] == -1)
+				{
+					group[bigger ^ 1] = CombineRec(group[bigger ^ 1], tmp[i]);
+					taken[i] = (bigger ^ 1);
+				}
+			}
+		}
+		*new_node = new RtreeNode;
+		(*new_node)->level = level;
+		node->count = 0;
+		for (int i = 0; i < M; i++)
+		{
+			node->branch[i].init();
+		}
+		for (int i = 0; i < M + 1; i++ + )
+		{
+			if (taken[i] == 0)
+			{
+				node->branch[(node->count)++] = tmp[i];
+			}
+			else
+			{
+				(*new_node)->branch[(*new_node)->count++] = tmp[i];
+			}
+		}
+		
+	}
+
+private:
+	static constexpr double eps = 1e-8;
+	static constexpr double Pi = 3.141592653589793238;
+	static constexpr double factorial(int n)
+	{
+		return n == 0 ? 1 : n * factorial(n - 1);
+	}
+	static constexpr double ipow(double a, int n)
+	{
+		return n == 0 ? 1 : a * ipow(a, n - 1);
+	}
+	static constexpr double vratio(int dim)
+	{
+		return dim % 2 ? 2 * factorial(dim / 2)*ipow(4 * Pi, dim / 2) / factorial(dim) : ipow(Pi, dim / 2) / factorial(dim / 2);
+	}
+	static constexpr int sign(double x)
+	{
+		return x < -eps ? -1 : x > eps;
+	}
+
+	static bool isbetter(double former, double increment, double bestinc, double bestfor)
+	{
+		if (sign(bestinc) < 0)
+		{
+			return true;
+		}
+		if (sign(increment - bestinc) < 0)
+		{
+			return true;
+		}
+		if (sign(increment - bestinc) == 0)
+		{
+			return sign(former - bestfor) < 0;
+		}
+		return 0;
+	}
 };
+
+#endif	//SJTU_RTREE

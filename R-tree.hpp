@@ -138,7 +138,7 @@ protected:
 
 	//int ChooseBranch(Rec *mbr, Node node); //返回node的所有branch中加入mbr之后覆盖矩形增量最小的branch编号 OK
 
-	Node ChooseLeaf(Rec *mbr, Root root);
+	//Node ChooseLeaf(Rec *mbr, Root root);
 
 	//bool AddBranch(Root root, RtreeBranch *br, Node node, Node *new_node); // OK
 
@@ -298,28 +298,7 @@ protected:
 
 	bool RtreeInsert(Root root, Rec *mbr, RtreeNode *node, Node *new_node, int level)
 	{
-		Node nn;
-		RtreeBranch nb;
-		if (node->level > level)
-		{
-			int i = ChooseBranch(mbr, node);
-			if (!RtreeInsert(root, mbr, node->branch[i].child, &nn, level))
-			{
-				node->branch[i].mbr = CombineRec(mbr, &(node->branch[i].mbr));
-				return 0;
-			}
 
-			node->branch[i].mbr = CoverRec(node->branch[i].child);
-			nb.child = nn;
-			nb.mbr = CoverRec(nn);
-			return AddBranch(root, &nb, node, new_node);
-		}
-		else
-		{
-			nb.mbr = *mbr;
-			nb.child = 0;
-			return AddBranch(root, &nb, node, new_node);
-		}
 	}
 
 	int RtreeSearch(const RtreeNode *node, const Rec *target)

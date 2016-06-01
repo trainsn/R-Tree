@@ -44,6 +44,19 @@ public:
 
 	void remove(const std::vector<double> &rec)
 	{ //删除一个区域(元素)
+		if(rec.size() != DIMENSION * 2)
+			throw std::invalid_argument("The number of input doesn't match dimension");
+		Rec target(rec);
+		std::vector<Rec> vRebuild;
+		remove(R_root->rnode, target, vRebuild);
+		assert(R_root->rnode->count >= 1);
+		if (R_root->rnode->count == 1)
+		{
+			RtreeNode *tmp = R_root->rnode;
+			R_root->rnode = R_root->rnode->branch[0].child;
+			delete tmp;
+		}
+		//TODO
 	}
 
 	int search(const std::vector<double> &rec)
@@ -69,6 +82,12 @@ protected:
 		{
 			memset(bound, 0, sizeof(bound));
 		}
+		Rec(const std::vector<double> &other)
+		{
+			assert(other.size() == 2 * DIMENSION);
+			for (int i = 0; i < 2 * DIMENSION; i++)
+				bound[i] = other[i];
+		}
 		void init()
 		{
 			memset(bound, 0, sizeof(bound));
@@ -78,6 +97,15 @@ protected:
 			for (int i = 0; i < DIMENSION; i++)
 				if (bound[i] > bound[i + DIMENSION])
 					return false;
+			return true;
+		}
+		bool operator==(const Rec &other) const
+		{
+			for (int i = 0; i < 2 * DIMENSION; i++)
+			{
+				if (sign(bound[i] - other.bound[i]) != 0)
+					return false;
+			}
 			return true;
 		}
 	};
@@ -150,7 +178,7 @@ protected:
 
 	int RtreeInsert(Root root, Rec *data, int level); // OK
 
-	int RtreeDelete(Root root, Rec *data);
+	//int RtreeDelete(Root root, Rec *data);
 
 	//..split 过程中还需要一些函数，未加入
 	//然而我现在全写在了split里面了 by Steiner
@@ -292,6 +320,7 @@ protected:
 	void DeleteBranch(RtreeNode *node, int i)
 	{
 		assert(node->count >= 1);
+		node->branch[i].child = nullptr;
 		std::swap(node->branch[i], node->branch[node->count-1]);
 		node->count--;
 	}
@@ -443,6 +472,45 @@ protected:
 		
 	}
 
+	//vRebuild: the rects (leaf node) the should be reinsert
+	//Return if the node o should be deleted
+	bool remove(RtreeNode *o, const Rec &rec, std::vector<Rec> &vRebuild)
+	{
+		assert(o);
+		if (o->level == 0)
+		{
+			assert(o->count == 1);
+			if (rec == o->branch[0].mbr)
+			{
+				Destroy(o);
+				return true;
+			}
+			return false;
+		}
+		int i = 0;
+		while (i < o->count)
+		{
+			if (RecOverlap(&rec, &o->branch[i].mbr))
+			{
+				++i;
+				continue;
+			}
+			if (!remove(o->branch[i].child, rec, vRebuild))
+			{
+				++i;
+				continue;
+			}
+			DeleteBranch(o, i);
+		}
+		if (o->count < M / 2)
+		{
+			enumLeaf(o, vRebuild);
+			Destroy(o);
+			return true;
+		}
+		return false;
+	}
+
 private:
 	static constexpr double eps = 1e-8;
 	static constexpr double Pi = 3.141592653589793238;
@@ -478,6 +546,18 @@ private:
 			return sign(former - bestfor) < 0;
 		}
 		return 0;
+	}
+
+	//add o's all leaf nodes to vec
+	void enumLeaf(RtreeNode *o, std::vector<Rec> &vec)
+	{
+		if (o->level == 0)
+		{
+			vec.push_back(o->branch[0].mbr);
+			return;
+		}
+		for (int i = 0; i < o->count; i++)
+			enumLeaf(o->branch[i].child, vec);
 	}
 };
 

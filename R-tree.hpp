@@ -20,72 +20,7 @@ protected:
 	struct RtreeNode;
 	struct RtreeBranch;
 	struct RtreeRoot;
-public:
-	RTree()
-	{
-		R_root = new RtreeRoot;
-		R_root->rnode = nullptr;
-	}
 
-	RTree(const RTree &other)
-	{
-
-	}
-
-	~RTree()
-	{
-		Destroy(R_root->rnode);
-		delete R_root;
-		R_root = 0;
-	}
-
-	void remove(const std::vector<double> &rec)
-	{ //删除一个区域(元素)
-		if (rec.size() != DIMENSION * 2)
-			throw std::invalid_argument("The number of input doesn't match dimension");
-		Rec target(rec);
-		std::vector<Rec> vRebuild;
-		remove(R_root->rnode, target, vRebuild, nullptr);
-		assert(R_root->rnode->count >= 1);
-		if (R_root->rnode->count == 1)
-		{
-			RtreeNode *tmp = R_root->rnode;
-			R_root->rnode = R_root->rnode->branch[0].child;
-			delete tmp;
-		}
-		for (const Rec &i : vRebuild)
-			insert(i);
-	}
-
-	int search(const std::vector<double> &rec)
-	{ // 查询一个区域内有多少元素
-		Rec data;
-		if (rec.size() != DIMENSION * 2)
-		{
-			throw std::invalid_argument("The number of input doesn't match dimension");
-		}
-		for (int i = 0; i < 2 * DIMENSION;i++)
-		{
-			data.bound[i] = rec[i];
-		}
-		return RtreeSearch(R_root, &data);
-	}
-	void insert(const std::vector<double> &rec)
-	{
-		Rec data;
-		if (rec.size() != DIMENSION * 2)
-		{
-			throw std::invalid_argument("The number of input doesn't match dimension");
-		}
-		for (int i = 0; i < 2 * DIMENSION; i++)
-		{
-			data.bound[i] = rec[i];
-		}
-		insert(data);
-		return;
-	}
-
-protected:
 	struct Rec
 	{ //n维空间矩形
 		double bound[2 * DIMENSION];
@@ -152,8 +87,6 @@ protected:
 	{
 		RtreeNode *rnode;
 	};
-
-	
 
 	typedef RtreeNode *Node;
 	typedef RtreeRoot *Root;
@@ -565,7 +498,7 @@ private:
 	}
 	static constexpr double vratio(int dim)
 	{
-		return dim % 2 ? 2 * factorial(dim / 2)*ipow(4 * Pi, dim / 2) / factorial(dim) : ipow(Pi, dim / 2) / factorial(dim / 2);
+		return dim % 2 ? 2 * factorial(dim / 2) * ipow(4 * Pi, dim / 2) / factorial(dim) : ipow(Pi, dim / 2) / factorial(dim / 2);
 	}
 	static constexpr int sign(double x)
 	{
@@ -600,6 +533,72 @@ private:
 		for (int i = 0; i < o->count; i++)
 			enumLeaf(o->branch[i].child, vec);
 	}
+    
+public:
+    RTree()
+    {
+        R_root = new RtreeRoot;
+        R_root->rnode = nullptr;
+    }
+    
+    RTree(const RTree &other)
+    {
+        
+    }
+    
+    ~RTree()
+    {
+        Destroy(R_root->rnode);
+        delete R_root;
+        R_root = 0;
+    }
+    
+    void remove(const std::vector<double> &rec)
+    { //删除一个区域(元素)
+        if (rec.size() != DIMENSION * 2)
+            throw std::invalid_argument("The number of input doesn't match dimension");
+        Rec target(rec);
+        std::vector<Rec> vRebuild;
+        remove(R_root->rnode, target, vRebuild, nullptr);
+        assert(R_root->rnode->count >= 1);
+        if (R_root->rnode->count == 1)
+        {
+            RtreeNode *tmp = R_root->rnode;
+            R_root->rnode = R_root->rnode->branch[0].child;
+            delete tmp;
+        }
+        for (const Rec &i : vRebuild)
+            insert(i);
+    }
+    
+    int search(const std::vector<double> &rec)
+    { // 查询一个区域内有多少元素
+        Rec data;
+        if (rec.size() != DIMENSION * 2)
+        {
+            throw std::invalid_argument("The number of input doesn't match dimension");
+        }
+        for (int i = 0; i < 2 * DIMENSION;i++)
+        {
+            data.bound[i] = rec[i];
+        }
+        return RtreeSearch(R_root, &data);
+    }
+    
+    void insert(const std::vector<double> &rec)
+    {
+        Rec data;
+        if (rec.size() != DIMENSION * 2)
+        {
+            throw std::invalid_argument("The number of input doesn't match dimension");
+        }
+        for (int i = 0; i < 2 * DIMENSION; i++)
+        {
+            data.bound[i] = rec[i];
+        }
+        insert(data);
+        return;
+    }
 };
 
 #endif	//SJTU_RTREE

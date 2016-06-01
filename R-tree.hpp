@@ -525,7 +525,7 @@ protected:
 		int i = 0;
 		while (i < o->count)
 		{
-			if (RecOverlap(&rec, &o->branch[i].mbr))
+			if (!RecOverlap(&rec, &o->branch[i].mbr))
 			{
 				++i;
 				continue;

@@ -313,6 +313,7 @@ protected:
 		if (!node->level)
 		{
 			new_node = new RtreeNode();
+			new_node->level = 0;
 			new_node->branch[new_node->count++].mbr = *mbr;
 			return true;
 		}

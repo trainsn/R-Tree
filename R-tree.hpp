@@ -81,7 +81,7 @@ public:
 		{
 			data.bound[i] = rec[i];
 		}
-		insert(rec);
+		insert(data);
 		return;
 	}
 

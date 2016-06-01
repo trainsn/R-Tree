@@ -176,11 +176,11 @@ protected:
 
 	int RtreeSearch(Root root, Rec *target); // OK
 
-	int RtreeInsert(Root root, Rec *data, int level); // OK
+	//int RtreeInsert(Root root, Rec *data, int level); // OK
 
-	bool RtreeInsert(Root root, Rec *mbr, RtreeNode *node, RtreeNode* &new_node, int level);
+	//bool RtreeInsert(Root root, Rec *mbr, RtreeNode *node, RtreeNode* &new_node, int level);
 
-	int RtreeDelete(Root root, Rec *data);
+	//int RtreeDelete(Root root, Rec *data);
 
 	//..split 过程中还需要一些函数，未加入
 	//然而我现在全写在了split里面了 by Steiner
@@ -197,16 +197,16 @@ protected:
 		return ret;
 	}
 
-	double RecArea(const Rec *mbr)
+	double RecArea(const Rec &mbr)
 	{
-		if (!mbr->is_valid())
+		if (!mbr.is_valid())
 			return 0;
 		static const double xpi = vratio(DIMENSION);
 		double ret = 0;
 		double sumr = 0;
 		for (int i = 0; i < DIMENSION; i++)
 		{
-			double len = (mbr->bound[i + DIMENSION] - mbr->bound[i]) / 2;
+			double len = (mbr.bound[i + DIMENSION] - mbr.bound[i]) / 2;
 			sumr += len * len;
 		}
 		double radius = sqrt(sumr);
@@ -214,20 +214,20 @@ protected:
 		return ret;
 	}
 
-	Rec CombineRec(const Rec *rc1, const Rec *rc2)
+	Rec CombineRec(const Rec &rc1, const Rec &rc2)
 	{
-		if (!rc1->is_valid())
-			return *rc2;
-		if (!rc2->is_valid())
-			return *rc1;
+		if (!rc1.is_valid())
+			return rc2;
+		if (!rc2.is_valid())
+			return rc1;
 		Rec ret;
 		for (int i = 0; i < DIMENSION; i++)
 		{
-			ret.bound[i] = std::min(rc1->bound[i], rc2->bound[i]);
+			ret.bound[i] = std::min(rc1.bound[i], rc2.bound[i]);
 		}
 		for (int i = DIMENSION; i < 2 * DIMENSION; i++)
 		{
-			ret.bound[i] = std::max(rc1->bound[i], rc2->bound[i]);
+			ret.bound[i] = std::max(rc1.bound[i], rc2.bound[i]);
 		}
 		return ret;
 	}
@@ -264,7 +264,7 @@ protected:
 			}
 			else
 			{
-				ret = CombineRec(&ret, &((node->branch[i]).mbr));
+				ret = CombineRec(ret, node->branch[i].mbr);
 			}
 		}
 		return ret;
@@ -295,9 +295,9 @@ protected:
 		double bestfor = -1;
 		for (int i = 0; i < node->count; i++)
 		{
-			Rec tmp = CombineRec(mbr, &((node->branch[i]).mbr));
-			double former = RecArea(&((node->branch[i]).mbr));
-			double increment = RecArea(&tmp) - former;
+			Rec tmp = CombineRec(*mbr, ((node->branch[i]).mbr));
+			double former = RecArea((node->branch[i]).mbr);
+			double increment = RecArea(tmp) - former;
 			if (best == -1 || isbetter(former, increment, bestinc, bestfor))
 			{
 				best = i;
@@ -308,14 +308,14 @@ protected:
 		return best;
 	}
 
-	bool AddBranch(Root root, RtreeBranch *br, RtreeNode *node, Node *new_node)
+	bool AddBranch(RtreeBranch *br, RtreeNode *node, Node *new_node)
 	{
 		if (node->count < M)
 		{
 			node->branch[node->count++] = *br;
 			return false;
 		}
-		SplitNode(root, node, br, new_node);
+		SplitNode(node, br, new_node);
 		return true;
 	}
 
@@ -327,8 +327,9 @@ protected:
 		node->count--;
 	}
 
-	bool RtreeInsert(Root root, Rec *mbr, RtreeNode *node, RtreeNode* &new_node, int level)
+	bool RtreeInsert(Rec *mbr, RtreeNode *node, RtreeNode* &new_node, int level)
 	{
+		assert(level == node->level);
 		if (!level)
 		{
 			new_node = new RtreeNode();
@@ -336,14 +337,14 @@ protected:
 			return true;
 		}
 		int chosen = ChooseBranch(mbr, node);
-		bool res = RtreeInsert(root, *mbr, node->branch[chosen].child, new_node, level - 1);
+		bool res = RtreeInsert(mbr, node->branch[chosen].child, new_node, level - 1);
 		node->branch[chosen].mbr = CoverRec(node->branch[chosen].child);
 		if (res)
-	{
-			RtreeBranch* nbra = new RtreeBranch();
-			nbra->mbr = CoverRec(new_node);
-			nbra->child = new_node;
-			return AddBranch(root, nbra, node, new_node);
+		{
+			RtreeBranch nbra;
+			nbra.mbr = CoverRec(new_node);
+			nbra.child = new_node;
+			return AddBranch(&nbra, node, &new_node);
 		}
 		return false;
 	}
@@ -373,7 +374,7 @@ protected:
 		return RtreeSearch(root->rnode, target);
 	}
 
-	void SplitNode(Root root, Node node, RtreeBranch *br, Node *new_node)
+	void SplitNode(Node node, RtreeBranch *br, Node *new_node)
 	{
 		static Rec tmp[M + 1];
 		static int taken[M + 1];
@@ -384,7 +385,7 @@ protected:
 		{
 			tmp[i] = node->branch[i].mbr;
 		}
-		tmp[M] = *br;
+		tmp[M] = br->mbr;
 		Node nn = new RtreeNode;
 		Rec uni = tmp[0];
 		for (int i = 1; i < M + 1; i++)
@@ -421,7 +422,7 @@ protected:
 		Rec group[2];
 		double garea[2];
 		group[0] = tmp[seed0];
-		group[1] = tmo[seed1];
+		group[1] = tmp[seed1];
 		garea[0] = tmpArea[seed0];
 		garea[1] = tmpArea[seed1];
 
@@ -430,7 +431,7 @@ protected:
 		int rest = M - 2;
 		int bigger = 0;
 		double best = -1;
-		pair<int, int> which = make_pair(-1, -1);
+		std::pair<int, int> which = std::make_pair(-1, -1);
 
 		for (; rest > 0 && count[bigger] < (M + 1) / 2; )
 		{
@@ -445,7 +446,7 @@ protected:
 				if (fabs(d0 - d1) > best)
 				{
 					best = fabs(d0 - d1);
-					which = make_pair((sign(d0 - d1) < 0 ? 0 : 1), i);
+					which = std::make_pair((sign(d0 - d1) < 0 ? 0 : 1), i);
 				}
 			}
 			taken[which.second] = which.first;
@@ -476,15 +477,15 @@ protected:
 		{
 			node->branch[i].init();
 		}
-		for (int i = 0; i < M + 1; i++ + )
+		for (int i = 0; i < M + 1; i++)
 		{
 			if (taken[i] == 0)
 			{
-				node->branch[(node->count)++] = tmp[i];
+				node->branch[(node->count)++].mbr = tmp[i];
 			}
 			else
 			{
-				(*new_node)->branch[(*new_node)->count++] = tmp[i];
+				(*new_node)->branch[(*new_node)->count++].mbr = tmp[i];
 			}
 		}
 		

@@ -444,6 +444,7 @@ protected:
 			tmpArea[i] = RecArea(tmp[i]);
 		}
 		double area = RecArea(uni);
+		double worst = -1;
 
 		int seed0 = -1, seed1 = -1;
 		for (int i = 0; i < M; i++)

@@ -72,7 +72,20 @@ public:
 		}
 		return RtreeSearch(R_root, &data);
 	}
-
+	void insert(const std::vector<double> &rec)
+	{
+		Rec data;
+		if (rec.size() != DIMENSION * 2)
+		{
+			throw std::invalid_argument("The number of input doesn't match dimension");
+		}
+		for (int i = 0; i < 2 * DIMENSION; i++)
+		{
+			data.bound[i] = rec[i];
+		}
+		insert(rec);
+		return;
+	}
 
 protected:
 	struct Rec
@@ -288,7 +301,7 @@ protected:
 
 
 
-	int ChooseBranch(Rec *mbr, Node node)
+	int ChooseBranch(const Rec *mbr, Node node)
 	{
 		int best = -1;
 		double bestinc = -1;
@@ -327,17 +340,17 @@ protected:
 		node->count--;
 	}
 
-	bool RtreeInsert(Rec *mbr, RtreeNode *node, RtreeNode* &new_node, int level)
+	bool RtreeInsert(const Rec *mbr, RtreeNode *node, RtreeNode* &new_node)
 	{
-		assert(level == node->level);
-		if (!level)
+		//assert(level == node->level);
+		if (!node->level)
 		{
 			new_node = new RtreeNode();
 			new_node->branch[new_node->count++].mbr = *mbr;
 			return true;
 		}
 		int chosen = ChooseBranch(mbr, node);
-		bool res = RtreeInsert(mbr, node->branch[chosen].child, new_node, level - 1);
+		bool res = RtreeInsert(mbr, node->branch[chosen].child, new_node);
 		node->branch[chosen].mbr = CoverRec(node->branch[chosen].child);
 		if (res)
 		{
@@ -348,7 +361,24 @@ protected:
 		}
 		return false;
 	}
+	void insert(const Rec & data)
+	{
+		RtreeNode *nnode;
+		bool res = RtreeInsert(&data, R_root->rnode, nnode);
+		if (res)
+		{
 
+			RtreeNode* & r=R_root->rnode;
+			RtreeNode* temp = r;
+			r=new RtreeNode();
+			r->branch[0].mbr = CoverRec(temp);
+			r->branch[1].mbr = CoverRec(nnode);
+			r->branch[0].child = temp;
+			r->branch[1].child = nnode;
+			r->count = 2;
+		}
+		return;
+	}
 	int RtreeSearch(const RtreeNode *node, const Rec *target)
 	{
 		int ret = 0;

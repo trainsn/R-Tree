@@ -38,17 +38,13 @@ public:
 		R_root = 0;
 	}
 
-	void insert(const std::vector<double> &rec)
-	{ //插入一个区域(元素)
-	}
-
 	void remove(const std::vector<double> &rec)
 	{ //删除一个区域(元素)
 		if(rec.size() != DIMENSION * 2)
 			throw std::invalid_argument("The number of input doesn't match dimension");
 		Rec target(rec);
 		std::vector<Rec> vRebuild;
-		remove(R_root->rnode, target, vRebuild);
+		remove(R_root->rnode, target, vRebuild, nullptr);
 		assert(R_root->rnode->count >= 1);
 		if (R_root->rnode->count == 1)
 		{
@@ -56,7 +52,8 @@ public:
 			R_root->rnode = R_root->rnode->branch[0].child;
 			delete tmp;
 		}
-		//TODO
+		for (const Rec &i : vRebuild)
+			insert(i);
 	}
 
 	int search(const std::vector<double> &rec)
@@ -94,6 +91,7 @@ protected:
 		Rec()
 		{
 			memset(bound, 0, sizeof(bound));
+			bound[0] = 1, bound[DIMENSION] = -1;
 		}
 		Rec(const std::vector<double> &other)
 		{
@@ -104,6 +102,7 @@ protected:
 		void init()
 		{
 			memset(bound, 0, sizeof(bound));
+			bound[0] = 1, bound[DIMENSION] = -1;
 		}
 		bool is_valid() const
 		{
@@ -523,7 +522,7 @@ protected:
 
 	//vRebuild: the rects (leaf node) the should be reinsert
 	//Return if the node o should be deleted
-	bool remove(RtreeNode *o, const Rec &rec, std::vector<Rec> &vRebuild)
+	bool remove(RtreeNode *o, const Rec &rec, std::vector<Rec> &vRebuild, RtreeBranch *branch)
 	{
 		assert(o);
 		if (o->level == 0)
@@ -531,6 +530,8 @@ protected:
 			assert(o->count == 1);
 			if (rec == o->branch[0].mbr)
 			{
+				if (branch)
+					branch->mbr.init();
 				Destroy(o);
 				return true;
 			}
@@ -544,19 +545,23 @@ protected:
 				++i;
 				continue;
 			}
-			if (!remove(o->branch[i].child, rec, vRebuild))
+			if (!remove(o->branch[i].child, rec, vRebuild, &o->branch[i]))
 			{
 				++i;
 				continue;
 			}
 			DeleteBranch(o, i);
 		}
-		if (o->count < M / 2)
+		if (o->count < M / 2 && o != R_root->rnode)
 		{
 			enumLeaf(o, vRebuild);
 			Destroy(o);
+			if (branch)
+				branch->mbr.init();
 			return true;
 		}
+		if (branch)
+			branch->mbr = CoverRec(o);
 		return false;
 	}
 

@@ -41,7 +41,7 @@ public:
 
 	void remove(const std::vector<double> &rec)
 	{ //删除一个区域(元素)
-		if(rec.size() != DIMENSION * 2)
+		if (rec.size() != DIMENSION * 2)
 			throw std::invalid_argument("The number of input doesn't match dimension");
 		Rec target(rec);
 		std::vector<Rec> vRebuild;
@@ -248,8 +248,6 @@ protected:
 		return ret;
 	}
 
-
-
 	void Destroy(RtreeNode *node)
 	{
 		if (!node)
@@ -263,8 +261,6 @@ protected:
 		delete node;
 		node = 0;
 	}
-
-
 
 	int ChooseBranch(const Rec *mbr, Node node)
 	{
@@ -329,6 +325,7 @@ protected:
 		}
 		return false;
 	}
+	
 	void insert(const Rec & data)
 	{
 		if (R_root->rnode)
@@ -362,6 +359,7 @@ protected:
 			return;
 		}
 	}
+	
 	int RtreeSearch(const RtreeNode *node, const Rec *target)
 	{
 		int ret = 0;

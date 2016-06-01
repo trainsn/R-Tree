@@ -150,6 +150,8 @@ protected:
 
 	int RtreeInsert(Root root, Rec *data, int level); // OK
 
+	bool RtreeInsert(Root root, Rec *mbr, RtreeNode *node, RtreeNode* &new_node, int level);
+
 	int RtreeDelete(Root root, Rec *data);
 
 	//..split 过程中还需要一些函数，未加入
@@ -296,9 +298,25 @@ protected:
 		node->count--;
 	}
 
-	bool RtreeInsert(Root root, Rec *mbr, RtreeNode *node, Node *new_node, int level)
+	bool RtreeInsert(Root root, Rec *mbr, RtreeNode *node, RtreeNode* &new_node, int level)
 	{
-
+		if (!level)
+		{
+			new_node = new RtreeNode();
+			new_node->branch[new_node->count++].mbr = *mbr;
+			return true;
+		}
+		int chosen = ChooseBranch(mbr, node);
+		bool res = RtreeInsert(root, *mbr, node->branch[chosen].child, new_node, level - 1);
+		node->branch[chosen].mbr = CoverRec(node->branch[chosen].child);
+		if (res)
+		{
+			RtreeBranch* nbra = new RtreeBranch();
+			nbra->mbr = CoverRec(new_node);
+			nbra->child = new_node;
+			return AddBranch(root, nbra, node, new_node);
+		}
+		return false;
 	}
 
 	int RtreeSearch(const RtreeNode *node, const Rec *target)

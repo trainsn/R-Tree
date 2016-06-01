@@ -160,41 +160,6 @@ protected:
 
 	RtreeRoot *R_root;
 
-	
-	/*int sons(Node node)
-	{ //返回一个结点的儿子数， 叶子和非叶子会有区别
-	}*/
-
-	//Rec NullRec(); //OK
-
-	//double RecArea(Rec *mbr); //n维矩形最小边界球体积 OK
-
-	//Rec CombineRec(Rec *rc1, Rec *rc2); //返回包含rc1和rc2的最小矩形 OK
-
-	//bool RecOverlap(Rec *rc1, Rec *rc2); //返回rc1和rc2是否overlap OK
-
-	void SplitNode(Root root, Node node, RtreeBranch *br, Node *new_node); //将node分裂成node和new_node 
-
-	//Rec CoverRec(Node node); //返回包含node中所有branch的最小矩形 OK
-
-	//int ChooseBranch(Rec *mbr, Node node); //返回node的所有branch中加入mbr之后覆盖矩形增量最小的branch编号 OK
-
-	//Node ChooseLeaf(Rec *mbr, Root root);
-
-	//bool AddBranch(Root root, RtreeBranch *br, Node node, Node *new_node); // OK
-
-	//void DeletBranch(Node node, int i); // OK
-
-	void Destroy(Node node); //释放空间,析构用 OK
-
-	int RtreeSearch(Root root, Rec *target); // OK
-
-	//int RtreeInsert(Root root, Rec *data, int level); // OK
-
-	//bool RtreeInsert(Root root, Rec *mbr, RtreeNode *node, RtreeNode* &new_node, int level);
-
-	//int RtreeDelete(Root root, Rec *data);
-
 	//..split 过程中还需要一些函数，未加入
 	//然而我现在全写在了split里面了 by Steiner
 
@@ -293,7 +258,7 @@ protected:
 		}
 		for (int i = 0; i < M; i++)
 		{
-			Destroy(node->branch[i].son);
+			Destroy(node->branch[i].child);
 		}
 		delete node;
 		node = 0;

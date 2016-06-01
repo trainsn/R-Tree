@@ -392,13 +392,15 @@ protected:
 		static Rec tmp[M + 1];
 		static int taken[M + 1];
 		static double tmpArea[M + 1];
-
+		static RtreeNode *tmpchild[M + 1];
 		int level = node->level;
 		for (int i = 0; i < M; i++)
 		{
 			tmp[i] = node->branch[i].mbr;
+			tmpchild[i] = node->branch[i].child;
 		}
 		tmp[M] = br->mbr;
+		tmpchild[M] = br->child;
 		Node nn = new RtreeNode;
 		Rec uni = tmp[0];
 		for (int i = 1; i < M + 1; i++)
@@ -496,10 +498,12 @@ protected:
 			if (taken[i] == 0)
 			{
 				node->branch[(node->count)++].mbr = tmp[i];
+				node->branch[(node->count) - 1].child = tmpchild[i];
 			}
 			else
 			{
 				(*new_node)->branch[(*new_node)->count++].mbr = tmp[i];
+				(*new_node)->branch[(*new_node)->count - 1].child = tmpchild[i];
 			}
 		}
 		

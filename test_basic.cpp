@@ -21,5 +21,6 @@ int main()
 		double f = i;
 		printf("%d\n", rt.search({f,f,f,100,100,100}));
 	}
+	system("pause");
 	return 0;
 }

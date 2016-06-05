@@ -10,7 +10,8 @@
 
 const int DIMENSION = 3; // R树维护的空间维数
 const int M = 10; //最大分支数
-
+const double eps = 1e-8;
+const double Pi = 3.141592653589793238;
 
 
 class RTree
@@ -486,21 +487,20 @@ protected:
 	}
 
 private:
-	static constexpr double eps = 1e-8;
-	static constexpr double Pi = 3.141592653589793238;
-	static constexpr double factorial(int n)
+
+	static const double factorial(int n)
 	{
 		return n == 0 ? 1 : n * factorial(n - 1);
 	}
-	static constexpr double ipow(double a, int n)
+	static const double ipow(double a, int n)
 	{
 		return n == 0 ? 1 : a * ipow(a, n - 1);
 	}
-	static constexpr double vratio(int dim)
+	static const double vratio(int dim)
 	{
 		return dim % 2 ? 2 * factorial(dim / 2) * ipow(4 * Pi, dim / 2) / factorial(dim) : ipow(Pi, dim / 2) / factorial(dim / 2);
 	}
-	static constexpr int sign(double x)
+	static const int sign(double x)
 	{
 		return x < -eps ? -1 : x > eps;
 	}
